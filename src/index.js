@@ -2,6 +2,7 @@
 import dotenv from "dotenv";
 import app from './app.js'
 import connectDB from "./db/index.js";
+import { testFun } from "./utils/asyncHandler.js";
 
 dotenv.config({
     path: './env'
@@ -17,6 +18,8 @@ connectDB()
     console.log("DB Connection FAILED ",err);
 })
 
+
+testFun();
 
 
 

@@ -9,7 +9,9 @@
 //         })
 //     }
 // }
-
+const testFun = () =>{
+    console.trace();
+}
 
 const asyncHandler = (requestHandler) => {
     (req, res, next) => {
@@ -18,4 +20,4 @@ const asyncHandler = (requestHandler) => {
     }
 }
 
-export { asyncHandler }
+export { asyncHandler , testFun}
