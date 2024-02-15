@@ -9,9 +9,6 @@
 //         })
 //     }
 // }
-const testFun = () =>{
-    console.trace();
-}
 
 const asyncHandler = (requestHandler) => {
     (req, res, next) => {
