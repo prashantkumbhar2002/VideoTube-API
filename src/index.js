@@ -1,31 +1,31 @@
-// // require('dotenv').config({path: './env'});
-// import dotenv from "dotenv";
-// import app from './app.js'
-// import connectDB from "./db/index.js";
+// require('dotenv').config({path: './env'});
+import dotenv from "dotenv";
+import app from './app.js'
+import connectDB from "./db/index.js";
 
-// dotenv.config({
-//     path: './env'
-// })
+dotenv.config({
+    path: './env'
+})
 
-// connectDB()
-// .then(() => {
-//     app.listen(process.env.PORT || 8000,() => {
-//         console.log(`Server is up and running on the port ${process.env.PORT}`);
-//     });
-// })
-// .catch((err)=>{
-//     console.log("DB Connection FAILED ",err);
-// })
-
-
+connectDB()
+.then(() => {
+    app.listen(process.env.PORT || 8000,() => {
+        console.log(`Server is up and running on the port ${process.env.PORT}`);
+    });
+})
+.catch((err)=>{
+    console.log("DB Connection FAILED ",err);
+})
 
 
 
 
 
+
+/*
 import mongoose from "mongoose";
 import express from 'express';
-import { DB_Name } from "./constants";
+import { DB_Name } from "./constants.js";
 const app = express()
 
 //while working with db always keep in mind that db is in remote so always try to use async/await and use the try catch
@@ -46,3 +46,4 @@ const app = express()
         throw error
     }
 })()                  
+*/
