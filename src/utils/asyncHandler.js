@@ -17,4 +17,4 @@ const asyncHandler = (requestHandler) => {
     }
 }
 
-export { asyncHandler , testFun}
+export { asyncHandler}
