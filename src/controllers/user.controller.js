@@ -29,16 +29,16 @@ const registerUser = asyncHandler(async (req, res) => {
     const existedUser = User.findOne({
         $or: "[{userName}, {email}]"
     });
-    console.log("🚀 ~ ========================== existedUser:", existedUser);
+    // console.log("🚀 ~ ========================== existedUser:", existedUser);
 
     if(existedUser){
         throw new APIError(409, "🚀 ~ User with email or userName already exist.");
     }
     const avatarLocalPath = req.files?.avatar[0]?.path;
-    console.log("🚀 ~ ========================== req.files:", req.files);
+    // console.log("🚀 ~ ========================== req.files:", req.files);
     
     const coverImageLocalPath = req.files?.coverImage[0]?.path;
-    console.log("🚀 ~ avatar Path  ~ coverImage Path:", avatarLocalPath, coverImageLocalPath)
+    // console.log("🚀 ~ avatar Path  ~ coverImage Path:", avatarLocalPath, coverImageLocalPath)
     if(avatarLocalPath) {
         throw new APIError(400, "🚀 ~ Avatar is required.");
     }
@@ -67,5 +67,28 @@ const registerUser = asyncHandler(async (req, res) => {
     )
 })
 
+
+const loginUser = asyncHandler(async (req, res)=>{
+    //get the userName and email and passwd
+    //check the email and userName is valid or not
+    //find the user 
+    //passwd check is valid or not
+    // access token and refresh token 
+    //send cookies
+
+
+    const { email, userName, password } = req.body;
+    if(!email && !userName) {
+        throw new APIError(400, "User or email is required..")
+    }
+
+    const user = await User.findOne({
+        $or: [{userName}, {email}]
+    })
+    if(!user){
+        throw new APIError(404, "User not found with this email or userName");
+    }
+    const isPasswordCorrect = await User
+})
 
 export {registerUser};
