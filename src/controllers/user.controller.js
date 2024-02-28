@@ -3,6 +3,21 @@ import { APIError } from "../utils/apiError.js"
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { APIResponse } from "../utils/apiResponse.js";
+
+const generateAccessAndRefreshTokens = async(userId) => {
+    try {
+        const user = await User.findById(userId);
+        const accessToken = user.geneateAccessToken();
+        const refreshToken = user.generateRefreshToken();
+        user.refreshToken = refreshToken;
+        user.save({validateBeforeSave: false});
+        return {accessToken, refreshToken};
+    } catch (error) {
+        throw new APIError(500, "Something went wrong while generating access and refresh token.");
+    }
+}
+
+
 const registerUser = asyncHandler(async (req, res) => {
     // res.status(200).json({
     //     message: "OK"
@@ -88,7 +103,35 @@ const loginUser = asyncHandler(async (req, res)=>{
     if(!user){
         throw new APIError(404, "User not found with this email or userName");
     }
-    const isPasswordCorrect = await User
+    const isPasswordCorrect = await user.isPasswordCorrect(password);
+    if(!isPasswordCorrect){
+        throw new APIError(401, "Invalid user credentials.");
+    }
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+
+    // here we have to think how to design and send the cookie to user
+    // actually at this point we dont have accessToken in our user obj bcz we have user from above user declaration and we are calling the accessToken just before this line
+    // So we have 2 options here : 
+    // 1. Update the user obj to add accessToken
+    // 2. One more DB call (if it is not expensive)
+
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+    return res.status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+        new APIResponse(
+            200,
+            {
+                user: loggedInUser,accessToken,refreshToken
+            },
+            "User logged-in Successfully"
+        )
+    )
 })
 
-export {registerUser};
+export {registerUser, loginUser};
