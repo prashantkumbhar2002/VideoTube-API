@@ -3,6 +3,7 @@ import { APIError } from "../utils/apiError.js"
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { APIResponse } from "../utils/apiResponse.js";
+import { text } from "express";
 
 const generateAccessAndRefreshTokens = async(userId) => {
     try {
@@ -10,7 +11,7 @@ const generateAccessAndRefreshTokens = async(userId) => {
         const accessToken = user.geneateAccessToken();
         const refreshToken = user.generateRefreshToken();
         user.refreshToken = refreshToken;
-        user.save({validateBeforeSave: false});
+        await user.save({validateBeforeSave: false});
         return {accessToken, refreshToken};
     } catch (error) {
         throw new APIError(500, "Something went wrong while generating access and refresh token.");
@@ -41,7 +42,7 @@ const registerUser = asyncHandler(async (req, res) => {
     })){
        throw new APIError(400, "🚀 ~ All fields are Required!");
     }
-    const existedUser = User.findOne({
+    const existedUser = await User.findOne({
         $or: "[{userName}, {email}]"
     });
     // console.log("🚀 ~ ========================== existedUser:", existedUser);
@@ -134,4 +135,30 @@ const loginUser = asyncHandler(async (req, res)=>{
     )
 })
 
-export {registerUser, loginUser};
+
+const logoutUser = asyncHandler(async(req, res) => {
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: {
+                refreshToken: undefined
+            }
+        },
+        {
+            new: true
+        }
+    )
+
+    const options = {
+        httpOnly:true,
+        secure:true
+    }
+
+    return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new APIResponse(200, {}, "User Logged Out Successfully"))
+})
+
+export {registerUser, loginUser, logoutUser};
