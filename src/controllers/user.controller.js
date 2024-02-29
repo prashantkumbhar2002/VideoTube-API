@@ -3,13 +3,12 @@ import { APIError } from "../utils/apiError.js"
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { APIResponse } from "../utils/apiResponse.js";
-import { text } from "express";
 
 const generateAccessAndRefreshTokens = async(userId) => {
     try {
         const user = await User.findById(userId);
-        const accessToken = user.geneateAccessToken();
-        const refreshToken = user.generateRefreshToken();
+        const accessToken = user.generateAccessToken();
+        const refreshToken = user.generateRefreshToken();        
         user.refreshToken = refreshToken;
         await user.save({validateBeforeSave: false});
         return {accessToken, refreshToken};
@@ -84,7 +83,7 @@ const registerUser = asyncHandler(async (req, res) => {
 })
 
 
-const loginUser = asyncHandler(async (req, res)=>{
+const loginUser = asyncHandler(async (req, res) => {
     //get the userName and email and passwd
     //check the email and userName is valid or not
     //find the user 
