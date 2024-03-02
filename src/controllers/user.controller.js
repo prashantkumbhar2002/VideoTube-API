@@ -186,7 +186,7 @@ const refreshAccessToken = asyncHandler(async(req, res) => {
     
         const { accessToken, refreshToken} = await generateAccessAndRefreshTokens(user._id);
     
-        res
+        return res
         .status(200)
         .cookie("accessToken", accessToken, options)
         .cookie("refreshToken", refreshToken, options)
@@ -203,4 +203,72 @@ const refreshAccessToken = asyncHandler(async(req, res) => {
         throw new APIError(401, error?.message || "Invalid Refresh token");
     }
 })
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+
+const changeCurrentPassword = asyncHandler(async(req, res) => {
+    const {oldPassword, newPassword} = req.body;
+    const user = User.findById(req.user?._id);
+
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+
+    if(!isPasswordCorrect){
+        throw new APIError(400, "Invalid Password");
+    }
+
+    user.password = newPassword;
+    await user.save({validateBeforeSave:false});
+
+    return res
+    .status(200)
+    .json(
+        new APIResponse(
+            200,
+            {},
+            "Password Updated successfully"
+        )
+    )
+})
+
+const getCurrentUser = asyncHandler(async(req, res) => {
+    return res
+    .status(200)
+    .json(
+        new APIResponse(
+            200,
+            req.user,
+            "User fetched Successfully"
+        )
+    )
+})
+
+
+const updateAccountDetails = asyncHandler(async(req, res) => {
+    const {fullName, email } = req.body;
+    if(!fullName || !email) {
+        throw new APIError(400, "All fields are required")
+    }
+
+    const user = User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set: {
+                // fullName: fullName,
+                // email: email
+
+                fullName,
+                email
+            }
+        },
+        {new: true}
+    ).select("-password")
+
+    return res
+    .status(200)
+    .json(
+        new APIResponse(
+            200, user, "Account details updated successfully"
+        )
+    )
+})
+
+
+export { registerUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword, getCurrentUser, updateAccountDetails };
