@@ -151,12 +151,16 @@ const loginUser = asyncHandler(async (req, res) => {
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
+  console.log(req.user._id)
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined,
-      },
+      // $set: {
+      //   refreshToken: undefined,
+      // },
+      $unset:{
+        refreshToken: 1
+      }
     },
     {
       new: true,
@@ -178,7 +182,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const incomingRefreshToken =
     req.cookies.refreshToken || req.body.refreshToken;
-  console.log(incomingRefreshToken);
+  // console.log(incomingRefreshToken);
   if (!incomingRefreshToken) {
     throw new APIError(401, "Unauthorized Request");
   }
@@ -189,7 +193,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET
     );
     const user = await User.findById(decodedToken?._id);
-    console.log(user);
+    // console.log(user);
     if (!user) {
       throw new APIError(401, "Invalid Refresh Token");
     }
@@ -227,7 +231,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
-  const user = User.findById(req.user?._id);
+  const user = await User.findById(req.user?._id);
 
   const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
 
@@ -255,7 +259,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     throw new APIError(400, "All fields are required");
   }
 
-  const user = User.findByIdAndUpdate(
+  const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
@@ -328,7 +332,7 @@ const updateCoverImage = asyncHandler(async (req, res) => {
 
 const getUserChannelProfile = asyncHandler(async (req, res) => {
   const { userName } = req.params;
-  if (!userName.trim()) {
+  if (!userName) {
     throw new APIError(400, "UserName is missing");
   }
 
@@ -400,7 +404,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
       $match: {
-        _id: mongoose.Types.ObjectId(req.user?._id),
+        _id: new mongoose.Types.ObjectId(req.user._id),
       },
     },
     {
@@ -438,7 +442,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
       },
     }
   ]);
-
+  // console.log(user[0].watchHistory)
   return res
     .status(200)
     .json(new APIResponse(200, user[0].watchHistory, "Watch history fetched"));
