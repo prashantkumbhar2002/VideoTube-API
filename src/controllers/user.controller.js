@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { APIError } from "../utils/apiError.js";
 import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { APIResponse } from "../utils/apiResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -158,7 +158,7 @@ const logoutUser = asyncHandler(async (req, res) => {
       // $set: {
       //   refreshToken: undefined,
       // },
-      $unset:{
+      $unset: {
         refreshToken: 1
       }
     },
@@ -279,29 +279,52 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 });
 
 const updateAvatar = asyncHandler(async (req, res) => {
+  const avatarOldCloudinaryURL = req.user?.avatar;
   const avatarLocalPath = req.file?.path;
   if (!avatarLocalPath) {
     throw new APIError(400, "Avatar file is missing");
   }
 
-  const avatar = await uploadOnCloudinary(avatarLocalPath);
-  if (!avatar) {
-    throw new APIError(400, "Error while uploading Avatar");
-  }
+  try {
+    const avatar = await uploadOnCloudinary(avatarLocalPath);
+    console.log(`"New Image updated successfully on cloudinary, avatar URL is ${avatar.url}"`)
+    if (!avatar.url) {
+      throw new APIError(400, "Error while uploading Avatar");
+    }
+    // const user = await User.findById(req.user?._id);
+    // const currentAvatarPublicId = user.avatar.split('/').pop().split('.')[0];
+    // if (currentAvatarPublicId) {
+    //   await deleteFromCloudinary(currentAvatarPublicId);
+    // }
 
-  const user = await User.findByIdAndUpdate(
-    req.user?._id,
-    {
-      $set: {
-        avatar: avatar.url,
+    if (avatar.url && avatarOldCloudinaryURL) {
+      try {
+        console.log("Now delete old avatar image from cloudinary")
+        const deleteAvatar = await deleteOldFile(avatarOldCloudinaryURL)
+        console.log("deleteAvatar :", deleteAvatar)
+        if (!deleteAvatar) {
+          throw new APIError(500, "Old Avator image failed to delete from cloudinary")
+        }
+      }
+      catch (error) {
+        throw new APIError(501, "Old Avator image failed to delete from cloudinary error : ", error)
+      }
+    }
+    const user = await User.findByIdAndUpdate(
+      req.user?._id,
+      {
+        $set: {
+          avatar: avatar.url,
+        },
       },
-    },
-    { new: true }
-  ).select("-password");
-
-  return res
-    .status(200)
-    .json(new APIResponse(200, user, "Avatar image is updated successfully"));
+      { new: true }
+    ).select("-password");
+    return res
+      .status(200)
+      .json(new APIResponse(200, user, "Avatar image is updated successfully"));
+  } catch (error) {
+    throw new APIError(400, "Error while deleting old avatar from Cloudinary");
+  }
 });
 
 const updateCoverImage = asyncHandler(async (req, res) => {
