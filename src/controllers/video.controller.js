@@ -1,19 +1,156 @@
-import { Video } from "../models/video.model";
-import { APIError } from "../utils/apiError";
-import { APIResponse } from "../utils/apiResponse";
-import { asyncHandler } from "../utils/asyncHandler";
-import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary";
-
-
-
+import mongoose, { isValidObjectId } from "mongoose";
+import { Video } from "../models/video.model.js";
+import { APIError } from "../utils/apiError.js";
+import { APIResponse } from "../utils/apiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 
 
 const getAllVideos = asyncHandler(async(req, res) => {
-    const { page = 1, limit = 10, query, sortBy, userId } = req.query
+    const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
     //TODO :: get all videos based on query, sort, pagination 
+    
+    
+    /* for using Full Text based search u need to create a search index in mongoDB atlas
+    you can include field mapppings in search index eg.title, description, as well
+    Field mappings specify which fields within your documents should be indexed for text search.
+    this helps in seraching only in title, desc providing faster search results
+    here the name of search index is 'search-videos' */
 
 
+    if (!query || !userId) {
+        throw new APIError(400, "Missing required query parameters.");
+    }
+    if (!isValidObjectId(userId)) {
+        throw new APIError(400, "Invalid userId");
+    }
+    // const pipeline = []
+    // pipeline.push({
+    //     $search: {
+    //         index: "searchVideos",
+    //         text: {
+    //             query: query,
+    //             path: ["title","description"]
+    //         }
+    //     },
+    // });
+    // pipeline.push({
+    //     $match: {
+    //         owner: mongoose.Types.ObjectId(userId)
+    //     }
+    // })
+    // pipeline.push({
+    //     $match: {
+    //         isPublished: true
+    //     }
+    // })
+    // //sortBy can be views, createdAt, duration
+    // //sortType can be ascending(1) or descending(-1)
+    // if(sortBy && sortType){
+    //     pipeline.push({
+    //         $sort: {
+    //             [sortBy]: sortType ==="asc" ? 1 : -1
+    //         }
+    //     })
+    // }
+    // else{
+    //     pipeline.push({
+    //         $sort: {
+    //             createdAt: -1
+    //         }
+    //     })
+    // }
+    // pipeline.push(
+    //     {
+    //         $lookup: {
+    //             from: "users",
+    //             localField: "owner",
+    //             foreignField: "_id",
+    //             as: "owner",
+    //             pipeline:[
+    //                 {
+    //                     $project: {
+    //                         userName: 1,
+    //                         avatar: 1
+    //                     }
+    //                 }
+    //             ]
+    //         }
+    //     },
+    //     {
+    //         $addFields:{
+    //             owner: {
+    //                 $first: "$owner"
+    //             }
+    //         }
+    //     }
+    // )
+
+    const pipeline = [
+        {
+            $search: {
+                index: "searchVideos",
+                text: {
+                    query: query,
+                    path: ["title","description"]
+                }
+            },
+        },
+        {
+            $match: {
+                owner: mongoose.Types.ObjectId(userId)
+            }
+        },
+        {
+            $match: {
+                isPublished: true
+            }
+        },
+        {
+            //sortBy can be views, createdAt, duration
+            //sortType can be ascending(1) or descending(-1)
+            $sort: {
+                [sortBy || "createdAt"]: sortType === "asc" ? 1 : -1 // Default to createdAt if sortBy is not provided
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+                pipeline:[
+                    {
+                        $project: {
+                            userName: 1,
+                            avatar: 1
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $addFields:{
+                owner: {
+                    $first: "$owner"
+                }
+            }
+        }
+    ]
+    try {
+        const videosAggregate = await Video.aggregate(pipeline);
+        const options = {
+            page: parseInt(page, 10),
+            limit: parseInt(limit, 10)
+        }
+        const videos = await Video.aggregatePaginate(videosAggregate, options);
+        return res.status(200)
+        .json(new APIResponse(200, videos, "Videos Fetched successfully"))
+    } catch (error) {
+        throw new APIError(500, "Error while fetching videos", error)
+    }
 })
+
 
 const publishVideo = asyncHandler(async(req, res) => {
     const { title, description } = req.params
