@@ -144,7 +144,8 @@ const getAllVideos = asyncHandler(async(req, res) => {
             limit: parseInt(limit, 10)
         }
         const videos = await Video.aggregatePaginate(videosAggregate, options);
-        return res.status(200)
+        return res
+        .status(200)
         .json(new APIResponse(200, videos, "Videos Fetched successfully"))
     } catch (error) {
         throw new APIError(500, "Error while fetching videos", error)
@@ -153,7 +154,10 @@ const getAllVideos = asyncHandler(async(req, res) => {
 
 
 const publishVideo = asyncHandler(async(req, res) => {
-    const { title, description } = req.params
+    const { title, description } = req.body
+    // console.log("🚀 ~ publishVideo ~ description:", description)
+    // console.log("🚀 ~ publishVideo ~ title:", title)
+    
     //TODO :: get video and upload to cloudinary and create video
 
      /*
@@ -168,9 +172,11 @@ const publishVideo = asyncHandler(async(req, res) => {
             throw new APIError(400, "Tile or Description is required")
         }
         const userId = req?.user._id
-    
-        const videoPath = req?.files.VideoFile[0].path;
+        // console.log("🚀 ~ publishVideo ~ userId:", userId)
+        const videoPath = req?.files.videoFile[0].path;
+        // console.log("🚀 ~ publishVideo ~ videoPath:", videoPath)
         const thumbnailPath = req?.files.thumbnail[0].path;
+        // console.log("🚀 ~ publishVideo ~ thumbnailPath:", thumbnailPath)
     
         if(!videoPath){
             throw new APIError(400, "Video File is required")
@@ -222,6 +228,12 @@ const publishVideo = asyncHandler(async(req, res) => {
 const getVideoById = asyncHandler(async(req, res) => {
     const { videoId } = req.params
     //TODO :: get Video by ID
+    if(!isValidObjectId(videoId)){
+        throw new APIError(400, "Invalid VideoId")
+    }
+    if(!isValidObjectId(req.user?._id)){
+        throw new APIError(400, "Invalid UserId")
+    }
     
 })
 
