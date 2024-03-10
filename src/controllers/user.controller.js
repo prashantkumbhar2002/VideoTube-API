@@ -52,9 +52,16 @@ const registerUser = asyncHandler(async (req, res) => {
   ) {
     throw new APIError(400, "🚀 ~ All fields are Required!");
   }
+  // const existedUser = await User.findOne({
+  //   $or: "[{userName}, {email}]",
+  // });
   const existedUser = await User.findOne({
-    $or: "[{userName}, {email}]",
+    $or: [
+      { userName: userName }, // Assuming 'userName' is the variable containing the value you want to match
+      { email: email } // Assuming 'email' is the variable containing the value you want to match
+    ]
   });
+  
   // console.log("🚀 ~ ========================== existedUser:", existedUser);
 
   if (existedUser) {
@@ -79,7 +86,7 @@ const registerUser = asyncHandler(async (req, res) => {
   }
   
   const user = await User.create({
-    fullName: avatar,
+    fullName: fullName,
     avatar: avatar.url,
     coverImage: coverImage?.url || "",
     email,
