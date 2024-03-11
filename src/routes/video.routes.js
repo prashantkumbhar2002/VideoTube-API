@@ -1,14 +1,15 @@
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { Router} from "express";
-import { getAllVideos, publishVideo } from "../controllers/video.controller.js";
+import { deleteVideo, getAllVideos, getVideoById, publishVideo, togglePublishStatus, updateVideo } from "../controllers/video.controller.js";
 
 const router = Router();
-router.use(verifyJWT);
+// router.use(verifyJWT);
 router
     .route("/")
     .get(getAllVideos)
     .post(
+        verifyJWT,
         upload.fields([
             {
                 name: "videoFile",
@@ -23,5 +24,14 @@ router
         publishVideo
     )
 
+router
+.route("/v/:videoId")
+.get(verifyJWT, getVideoById)
+.delete(verifyJWT, deleteVideo)
+.patch(verifyJWT, upload.single("thumbnail"), updateVideo);
+
+router
+.route("/toggle/publish/:videoId")
+.patch(verifyJWT, togglePublishStatus);
 
 export default router;
