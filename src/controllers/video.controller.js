@@ -357,8 +357,82 @@ const getVideoById = asyncHandler(async(req, res) => {
 
 const updateVideo = asyncHandler(async(req, res) => {
     const { videoId } = req.params
+    // console.log("🚀 ~ updateVideo ~ videoId:", videoId)
     //TODO :: update video details like title, description, thumbnail
-})
+    const { title, description } = req.body;
+    if(!isValidObjectId(videoId)){
+        throw new APIError(400, "Invalid VideoId");
+    }
+    // if (!title && !description) {
+    //     throw new APIError(400, "At least title or description is required.");
+    // }
+    
+    const video = await Video.findById(videoId);
+    if(!video){
+        throw new APIError(404, "Video not found")
+    }
+    const updatedfields = {};
+    if(title && title !== video.title){
+        updatedfields.title = title;
+    }
+    if(description && description !== video.description){
+        updatedfields.description = description;
+    }
+
+    if(video?.owner.toString() !== req?.user._id.toString()){
+        throw new APIError(400, "Dont have permission to edit video as Owner is different");
+    }
+
+    const thumbnailPathtoDel = video.thumbnail;
+    const newThumbnailPath = req.file?.path;
+    // if(!newThumbnailPath){
+    //     throw new APIError(400, "Thumbnail is required.")   
+    // }
+    
+    if(newThumbnailPath){
+        const thumbnail = await uploadOnCloudinary(newThumbnailPath)
+        // console.log("🚀 ~ updateVideo ~ thumbnail:", thumbnail)
+        
+        if (!thumbnail){
+            throw new APIError(400, "Failed to upload new thumbnail to Cloudinary");
+        }
+        updatedfields.thumbnail = thumbnail.secure_url
+    }
+    // else{
+    //     updatedfields.thumbnail = video.thumbnail
+    // }
+    // console.log("🚀 ~ updateVideo ~ updatedfields.thumbnail:", updatedfields.thumbnail)
+    
+    if(Object.keys(updatedfields).length === 0){
+        return res
+        .status(200)
+        .json(new APIResponse(200, video, "No changes made to video title or description"))
+    }
+    else{
+        
+    const updatedVideo = await Video.findByIdAndUpdate(
+        videoId,
+        { $set: updatedfields },
+        { new: true }
+    )
+    // console.log("🚀 ~ updateVideo ~ updatedVideo:=====================>", updatedVideo)
+    
+        if(!updatedVideo){
+            throw new APIError(500, "Failed to update video")
+        }
+
+        if(newThumbnailPath && updatedVideo){
+            await deleteFromCloudinary(thumbnailPathtoDel)
+        }
+
+        res
+        .status(200)
+        .json(
+            new APIResponse(200, updatedVideo, "Video updated successfully")
+        );
+    }
+
+});
 
 const deleteVideo = asyncHandler(async(req, res) => {
     const { videoId } = req.params
