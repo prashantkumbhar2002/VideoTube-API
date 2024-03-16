@@ -5,6 +5,8 @@ import { APIResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { User } from "../models/user.model.js";
+import {Like} from "../models/like.model.js"
+import {Comment} from "../models/comment.model.js";
 import { json } from "express";
 
 
@@ -229,9 +231,14 @@ const publishVideo = asyncHandler(async(req, res) => {
 
 const getVideoById = asyncHandler(async(req, res) => {
     const { videoId } = req.params
+    console.log("🚀 ~ getVideoById ~ videoId:", videoId)
     //TODO :: get Video by ID
     if(!isValidObjectId(videoId)){
         throw new APIError(400, "Invalid VideoId")
+    }
+    const v = await Video.findById(videoId);
+    if(!v){
+        throw new APIError(404, "Invalid VideoId")
     }
     if(!isValidObjectId(req.user?._id)){
         throw new APIError(400, "Invalid UserId")
@@ -331,7 +338,7 @@ const getVideoById = asyncHandler(async(req, res) => {
         }
     ])
 
-    if(!video){
+    if(!video[0]){
         throw new APIError(500, "Failed to fetch video")
     }
     await Video.findByIdAndUpdate(
@@ -380,7 +387,7 @@ const updateVideo = asyncHandler(async(req, res) => {
     }
 
     if(video?.owner.toString() !== req?.user._id.toString()){
-        throw new APIError(400, "Dont have permission to edit video as Owner is different");
+        throw new APIError(400, "Dont have permission to edit video as u are not Owner");
     }
 
     const thumbnailPathtoDel = video.thumbnail;
@@ -437,7 +444,36 @@ const updateVideo = asyncHandler(async(req, res) => {
 const deleteVideo = asyncHandler(async(req, res) => {
     const { videoId } = req.params
     //TODO :: delete Video
+    if(!isValidObjectId(videoId)){
+        throw new APIError(400, "Invalid VideoId")
+    }
+    const video = await Video.findById(videoId);
+    if(!video){
+        throw new APIError(400, "Video not found")
+    }
+
+    if(video.owner.toString() !== req?.user._id.toString()){
+        throw new APIError(400, "Cant delete video as u are not owner")
+    }
+
+    const videodelete = await Video.findByIdAndDelete(video?._id)
+    if(!videodelete){
+        throw new APIError(500, "Failed to delete video. Please try again")
+    }
+
+    await deleteFromCloudinary(video.thumbnail);
+    await deleteFromCloudinary(video.videoFile, "video");
+       
+    await Like.deleteMany({video: videoId});
+    await Comment.deleteMany({video: videoId})
+
+    return res
+    .status(200)
+    .json(
+        new APIResponse(200, {}, "Successfully deleted video")
+    )
 })
+    
 
 const togglePublishStatus = asyncHandler((req, res) => {
     const { videoId } = req.params
