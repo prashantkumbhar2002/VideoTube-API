@@ -7,7 +7,6 @@ import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js
 import { User } from "../models/user.model.js";
 import {Like} from "../models/like.model.js"
 import {Comment} from "../models/comment.model.js";
-import { json } from "express";
 
 
 const getAllVideos = asyncHandler(async(req, res) => {
@@ -231,7 +230,7 @@ const publishVideo = asyncHandler(async(req, res) => {
 
 const getVideoById = asyncHandler(async(req, res) => {
     const { videoId } = req.params
-    console.log("🚀 ~ getVideoById ~ videoId:", videoId)
+    // console.log("🚀 ~ getVideoById ~ videoId:", videoId)
     //TODO :: get Video by ID
     if(!isValidObjectId(videoId)){
         throw new APIError(400, "Invalid VideoId")
@@ -475,8 +474,37 @@ const deleteVideo = asyncHandler(async(req, res) => {
 })
     
 
-const togglePublishStatus = asyncHandler((req, res) => {
+const togglePublishStatus = asyncHandler(async(req, res) => {
     const { videoId } = req.params
+
+    if(!isValidObjectId(videoId)){
+        throw new APIError(400, "Invalid videoId")
+    }
+    const video = await Video.findById(videoId);
+    if(!video){
+        throw new APIError(404, "Video not found")
+    }
+
+    if(video?.owner.toString() !== req.user?._id.toString()){
+        throw new APIError(400, "Cant perform this action as u are not owner")
+    }
+
+    const toggledVideoPublish = await Video.findByIdAndUpdate(
+        videoId,
+        {
+            $set: {
+                isPublished: !video.isPublished
+            }
+        },
+        {new: true}
+    )
+    if(!toggledVideoPublish){
+        throw new APIError(500, "Failed to toggle video publish status")
+    }
+
+    return res
+    .status(200)
+    .json(new APIResponse(200, {isPublished: toggledVideoPublish.isPublished}, "Video publish toggled successfully"))
 })
 
 
