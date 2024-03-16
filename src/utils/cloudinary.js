@@ -24,14 +24,19 @@ const uploadOnCloudinary = async (localpath) => {
     }
 }
 
-const deleteFromCloudinary = async (avatarOldCloudinaryURL) => {
+const deleteFromCloudinary = async (CloudinaryURL, resource_type= "image") => {
+    // console.log("🚀 ~ deleteFromCloudinary ~ CloudinaryURL:", CloudinaryURL)
     try {
 
-        const oldAvatarPublicId = avatarOldCloudinaryURL.split('/').pop().split('.')[0];
+        const PublicId = CloudinaryURL.split('/').pop().split('.')[0];
+        // console.log("🚀 ~ deleteFromCloudinary ~ PublicId:", PublicId)
 
-        if (!oldAvatarPublicId) return null;
+        if (!PublicId) return null;
         // Delete the file from Cloudinary
-        const response = await cloudinary.uploader.destroy(oldAvatarPublicId);
+        const response = await cloudinary.uploader.destroy(PublicId, {
+            resource_type: `${resource_type}`
+        });
+        // console.log("🚀 ~ deleteFromCloudinary ~ response:", response)
         return response;
         
     } catch (error) {
