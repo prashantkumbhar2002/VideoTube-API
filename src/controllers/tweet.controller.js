@@ -133,10 +133,64 @@ const getUserTweets = asyncHandler(async (req, res) => {
 
 const updateTweet = asyncHandler(async (req, res) => {
     //TODO: update tweet
+    const {tweetId} = req.params;
+    const {content} = req.body;
+    if(!content){
+        throw new APIError(400, "Content is required")
+    }
+    if(!isValidObjectId(tweetId)){
+        throw new APIError(400, "Invalid tweet id")
+    }
+    const tweet = await Tweet.findById(tweetId);
+    if(!tweet){
+        throw new APIError(400, "Tweet not found")
+    }
+    if(tweet?.owner.toString() !== req.user?._id.toString()){
+        throw new APIError(400, "Cannot have permissions to edit tweet as u are not owner")
+    }
+    const updatedTweet = await Tweet.findByIdAndUpdate(
+        tweetId,
+        {
+            $set: {
+                content
+            }
+        },
+        {
+            new: true
+        }
+    )
+
+    if(!updatedTweet){
+        throw new APIError(500, "Failed to update the tweet. Please try again")
+    }
+    return res
+    .status(200)
+    .json(
+        new APIResponse(200, updatedTweet, "Tweet updated sucessfully")
+    )
 })
 
 const deleteTweet = asyncHandler(async (req, res) => {
     //TODO: delete tweet
+    const {tweetId} = req.params;
+    if(!tweetId) {
+        throw new APIError(400, "Invalid tweetId")
+    }
+    const tweet = await Tweet.findById(tweetId)
+    if(!tweet){
+        throw new APIError(400, "Tweet not found")
+    }
+
+    if(tweet?.owner.toString() !== req.user?._id.toString()){
+        throw new APIError(400, "Cannot delete the tweet as u are not owner")
+    }
+
+    await Tweet.findByIdAndDelete(tweetId)
+    return res
+    .status(200)
+    .json(
+        new APIResponse(200, {tweetId}, "Tweet deleted successfully")
+    )
 })
 
 export {
