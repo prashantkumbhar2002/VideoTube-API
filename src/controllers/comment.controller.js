@@ -4,6 +4,7 @@ import { Video } from "../models/video.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { APIError } from "../utils/apiError.js"
 import { APIResponse } from "../utils/apiResponse.js"
+import { Like } from "../models/like.model.js";
 
 // const getVideoComments = asyncHandler(async (req, res) => {
 //     //TODO: get all comments for a video
@@ -264,6 +265,33 @@ const updateComment = asyncHandler(async (req, res) => {
 
 const deleteComment = asyncHandler(async (req, res) => {
     // TODO: delete a comment
+    const {commentId} = req.params;
+    if(!(commentId && isValidObjectId(commentId))){
+        throw new APIError(400, "commentID is invalid")
+    }
+
+    const comment = await Comment.findById(commentId);
+    if(!comment){
+        throw new APIError(400, "comment not found")
+    }
+
+    if(comment.owner.toString() !== req.user?._id.toString()){
+        throw new APIError(400, "Cannot delete comment as u are not owner")
+    }
+
+    const dComment = await Comment.findByIdAndDelete(commentId);
+    if(!dComment){
+        throw new APIError(500, "Failed to delete comment")
+    }
+    await Like.deleteMany(
+        {
+            comment: commentId,
+            likedBy: req.user
+        }
+    )
+    return res
+    .status(200)
+    .json(new APIResponse(200, {}, "Comment deleted successfully"))
 })
 
 export {
