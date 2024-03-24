@@ -35,12 +35,66 @@ const createPlaylist = asyncHandler(async (req, res) => {
     }
 })
 
-const getUserPlaylists = asyncHandler(async (req, res) => {
+// const getUserPlaylists = asyncHandler(async (req, res) => {
+//     const {userId} = req.params;
+//     //TODO: get user playlists
+//     if(!userId || !isValidObjectId(userId)){
+//         throw new APIError(400, "Invalid UserId")
+//     }
+//     const userPlaylist = await Playlist.aggregate([
+//         {
+//             $match: {
+//                 owner: new mongoose.Types.ObjectId(userId)
+//             }
+//         },
+//         {
+//             $lookup:{
+//                 from: "videos",
+//                 localField: "videos",
+//                 foreignField: "_id",
+//                 as: "videos"
+//             }
+//         },
+//         {
+//             $addFields: {
+//                 totalVideos: {
+//                     $size: "$videos"
+//                 },
+//                 totalViews: {
+//                     $sum: "$videos.views"
+//                 }
+//             }
+//         },
+//         {
+//             $project: {
+//                 _id: 1,
+//                 name: 1,
+//                 description: 1,
+//                 totalVideos: 1,
+//                 totalViews: 1,
+//                 updatedAt: 1
+//             }
+//         }
+//     ])
+
+//     if(!userPlaylist?.length){
+//         throw new APIError(500, "Failed to fetch User Playlist")
+//     }
+    
+//     return res
+//     .status(200)
+//     .json(
+//         new APIResponse(200, userPlaylis[0], "Playlist fetched successfully")
+//     )
+// })
+
+const getUserPlaylists = asyncHandler(async(req, res) => {
     const {userId} = req.params;
-    //TODO: get user playlists
-    if(!userId || !isValidObjectId(userId)){
-        throw new APIError(400, "Invalid UserId")
+
+    if(!userId){
+        throw new APIError(400, "Please provide userID.")
     }
+
     const userPlaylist = await Playlist.aggregate([
         {
             $match: {
@@ -48,7 +102,7 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
             }
         },
         {
-            $lookup:{
+            $lookup: {
                 from: "videos",
                 localField: "videos",
                 foreignField: "_id",
@@ -56,13 +110,49 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
             }
         },
         {
+            $unwind: "videos"
+        },
+        {
+            $lookup: {
+                from: "likes",
+                localField: "videos._id",
+                foreignField: "video",
+                as: "videos.likes"
+            }
+        },
+        {
             $addFields: {
-                totalVideos: {
-                    $size: "$videos"
-                },
-                totalViews: {
-                    $sum: "$videos.views"
-                }
+                "videos.totalLikes": { $size: "$videos.likes" }
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "videos.owner",
+                foreignField: "_id",
+                as: "videos.videoOwner"
+            }
+        },
+        {
+            $addFields: {
+                "videos.videoOwner": { $arrayElemAt: ["$videos.videoOwner", 0] }
+            }
+        },
+        {
+            $match: {
+                "videos.isPublished": true
+            }
+        },
+        {
+            $group: {
+                _id: "$_id",
+                name: {$first: "$name" },
+                description: { $first: "$description" },
+                createdAt: { $first: "$createdAt" },
+                updatedAt: { $first: "$updatedAt" },
+                totalVideos: { $sum: 1 },
+                totalVideos: { $sum: "$videos.totalLikes" },
+                videos: { $push: "$vidoes" }
             }
         },
         {
@@ -70,22 +160,30 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
                 _id: 1,
                 name: 1,
                 description: 1,
+                createdAt: 1,
+                updatedAt: 1,
                 totalVideos: 1,
                 totalViews: 1,
-                updatedAt: 1
+                totalLikes: 1,
+                videos: {
+                    _id: 1,
+                    videoFile: 1,
+                    thumbnail: 1,
+                    title: 1,
+                    description: 1,
+                    duration: 1,
+                    createdAt: 1,
+                    views: 1,
+                    likes: "$totalLikes",
+                    videoOwner: {
+                        username: 1,
+                        email: 1,
+                        fullName: 1
+                    }
+                }
             }
         }
     ])
-
-    if(!userPlaylist?.length){
-        throw new APIError(500, "Failed to fetch User Playlist")
-    }
-    
-    return res
-    .status(200)
-    .json(
-        new APIResponse(200, userPlaylis[0], "Playlist fetched successfully")
-    )
 })
 
 const getPlaylistById = asyncHandler(async (req, res) => {
