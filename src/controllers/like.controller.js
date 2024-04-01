@@ -12,7 +12,7 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
     }
     const video = await Video.findById(videoId);
     if(!video){
-        throw new APIError(404, "Video not found")
+        throw new APIError(404, "Video not found");
     }
     const likedAlready = await Like.findOne({
         video: videoId,
@@ -20,7 +20,7 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
     })
     
     if(likedAlready){
-        await Like.findOneAndDelete(likedAlready?._id);
+        await Like.findByIdAndDelete(likedAlready?._id);
         return res
         .status(200)
         .json(new APIResponse(200, {isLiked: false}))
@@ -39,7 +39,30 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
 const toggleCommentLike = asyncHandler(async (req, res) => {
     const {commentId} = req.params
     //TODO: toggle like on comment
-
+    if(!commentId || !isValidObjectId(commentId)){
+        throw new APIError(400, "Invalid commentId");
+    }
+    const comment = await Comment.findById(commentId);
+    if(!comment){
+        throw new APIError(400, "Comment not found");
+    }
+    const alreadyLiked = await Like.findOne({
+        comment: commentId,
+        likedBy: req.user?._id,
+    });
+    if(alreadyLiked){
+        await Like.findByIdAndDelete(alreadyLiked?._id)
+        return res
+            .status(200)
+            .json( new APIResponse(200, {isLiked: false}))
+    }
+    await Like.create({
+        comment: commentId,
+        likedBy: req.user?._id
+    });
+    return res
+        .status(200)
+        .json( new APIResponse(200, {isLiked: true}))
 })
 
 const toggleTweetLike = asyncHandler(async (req, res) => {
