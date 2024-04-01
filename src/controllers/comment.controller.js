@@ -1,188 +1,193 @@
 import mongoose, {isValidObjectId} from "mongoose"
-import {Comment} from "../models/comment.model.js"
+import { Comment } from "../models/comment.model.js"
 import { Video } from "../models/video.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { APIError } from "../utils/apiError.js"
 import { APIResponse } from "../utils/apiResponse.js"
 import { Like } from "../models/like.model.js";
 
-// const getVideoComments = asyncHandler(async (req, res) => {
-//     //TODO: get all comments for a video
-//     const {videoId} = req.params
-//     const {page = 1, limit = 10} = req.query
-
-//     if(!(videoId && isValidObjectId(videoId))){
-//         throw new APIError(400, "VideoId not found")
-//     }
-
-//     const video = await Video.findById(videoId)
-//     if(!video){
-//         throw new APIError(400, "Video not found")
-//     }
-
-//     const commentAgg = Comment.aggregate([
-//         {
-//             $match: new mongoose.Types.ObjectId(videoId)
-//         },
-//         {
-//             $lookup: {
-//                 from: "users",
-//                 localField: "owner",
-//                 foreignField: "_id",
-//                 as: "owner"
-//             }
-//         },
-//         {
-//             $lookup: {
-//                 from: "likes",
-//                 localField: "_id",
-//                 foreignField: "comment",
-//                 as: "likes"
-//             }
-//         },
-//         {
-//             $addFields: {
-//                 likesCount: {
-//                     $size: "$likes"
-//                 },
-//                 owner: {
-//                     $first: "$owner"
-//                 },
-//                 isLiked: {
-//                     $cond: {
-//                         if: { $in: [req.user?._id, "$likes.likedBy"] },
-//                         then: true,
-//                         else: false
-//                     }
-//                 }
-//             }
-//         },
-//         {
-//             $sort:{
-//                 createdAt: -1
-//             }
-//         },
-//         {
-//             $project: {
-//                 content: 1,
-//                 createdAt: 1,
-//                 isLiked: 1,
-//                 likesCount: 1,
-//         //only send essential owner information
-//                 owner: {
-//                     userName: 1, 
-//                     fullName: 1,
-//                     avatar: 1
-//                 }
-//             }
-//         }
-//     ]);
-//     const options = {
-//         page: parseInt(page, 10),
-//         limit: parseInt(limit, 10)
-//     }
-//     const comment = await Comment.aggregatePaginate(commentAgg, options)
-//     return res
-//     .status(200)
-//     .json(
-//         new APIResponse(200, comment, "comments fetched successfully")
-//     )
-// })
-
 const getVideoComments = asyncHandler(async (req, res) => {
-    const { videoId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
+    //TODO: get all comments for a video
+    const {videoId} = req.params
+    const {page = 1, limit = 10} = req.query
 
-    if (!(videoId && isValidObjectId(videoId))) {
-        return res.status(400).json(new APIResponse(400, null, "VideoId not found"));
+    if(!(videoId && isValidObjectId(videoId))){
+        throw new APIError(400, "VideoId not found")
     }
 
-    const pipeline = [
+    const video = await Video.findById(videoId)
+    if(!video){
+        throw new APIError(400, "Video not found")
+    }
+
+    const commentAgg = Comment.aggregate([
         {
             $match: {
-                _id: mongoose.Types.ObjectId(videoId)
+                video: new mongoose.Types.ObjectId(videoId)
             }
         },
         {
             $lookup: {
-                from: "comments",
-                let: { videoId: "$_id" },
-                pipeline: [
-                    {
-                        $match: {
-                            $expr: { $eq: ["$videoId", "$$videoId"] }
-                        }
-                    },
-                    {
-                        $lookup: {
-                            from: "users",
-                            localField: "owner",
-                            foreignField: "_id",
-                            as: "owner"
-                        }
-                    },
-                    {
-                        $lookup: {
-                            from: "likes",
-                            localField: "_id",
-                            foreignField: "comment",
-                            as: "likes"
-                        }
-                    },
-                    {
-                        $addFields: {
-                            likesCount: { $size: "$likes" },
-                            owner: { $first: "$owner" },
-                            isLiked: {
-                                $cond: {
-                                    if: { $in: [req.user?._id, "$likes.likedBy"] },
-                                    then: true,
-                                    else: false
-                                }
-                            }
-                        }
-                    },
-                    {
-                        $project: {
-                            content: 1,
-                            createdAt: 1,
-                            isLiked: 1,
-                            likesCount: 1,
-                            owner: {
-                                userName: 1,
-                                fullName: 1,
-                                avatar: 1
-                            }
-                        }
-                    }
-                ],
-                as: "comments"
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner"
             }
         },
         {
-            $unwind: "$comments"
+            $lookup: {
+                from: "likes",
+                localField: "_id",
+                foreignField: "comment",
+                as: "likes"
+            }
         },
         {
-            $replaceRoot: { newRoot: "$comments" }
+            $addFields: {
+                likesCount: {
+                    $size: "$likes"
+                },
+                owner: {
+                    $first: "$owner"
+                },
+                isLiked: {
+                    $cond: {
+                        if: { $in: [req.user?._id, "$likes.likedBy"] },
+                        then: true,
+                        else: false
+                    }
+                }
+            }
         },
         {
-            $sort: { createdAt: -1 }
+            $sort:{
+                createdAt: -1
+            }
+        },
+        {
+            $project: {
+                content: 1,
+                createdAt: 1,
+                isLiked: 1,
+                likesCount: 1,
+        //only send essential owner information
+                owner: {
+                    userName: 1, 
+                    fullName: 1,
+                    avatar: 1
+                }
+            }
         }
-    ];
-
+    ]);
     const options = {
         page: parseInt(page, 10),
         limit: parseInt(limit, 10)
-    };
-
-    try {
-        const result = await Video.aggregatePaginate(Video.aggregate(pipeline), options);
-        return res.status(200).json(new APIResponse(200, result, "Comments fetched successfully"));
-    } catch (error) {
-        console.error("Error fetching comments:", error);
-        return res.status(500).json(new APIResponse(500, null, "Internal Server Error"));
     }
-});
+    const comment = await Comment.aggregatePaginate(commentAgg, options)
+    return res
+    .status(200)
+    .json(
+        new APIResponse(200, comment, "Comments Fetched successfully")
+    )
+})
+
+// const getVideoComments = asyncHandler(async (req, res) => {
+//     const { videoId } = req.params;
+//     const { page = 1, limit = 10 } = req.query;
+
+//     if (!(videoId && isValidObjectId(videoId))) {
+//         return res
+//         .status(400)
+//         .json(new APIError(400, "VideoId not found"));
+//     }
+
+//     const pipeline = [
+//         {
+//             $match: {
+//                 _id: new mongoose.Types.ObjectId(videoId)
+//             }
+//         },
+//         {
+//             $lookup: {
+//                 from: "comments",
+//                 let: { videoId: "$_id" },
+//                 pipeline: [
+//                     {
+//                         $match: {
+//                             $expr: { $eq: ["$videoId", "$$videoId"] }
+//                         }
+//                     },
+//                     {
+//                         $lookup: {
+//                             from: "users",
+//                             localField: "owner",
+//                             foreignField: "_id",
+//                             as: "owner"
+//                         }
+//                     },
+//                     {
+//                         $lookup: {
+//                             from: "likes",
+//                             localField: "_id",
+//                             foreignField: "comment",
+//                             as: "likes"
+//                         }
+//                     },
+//                     {
+//                         $addFields: {
+//                             likesCount: { $size: "$likes" },
+//                             owner: { $first: "$owner" },
+//                             isLiked: {
+//                                 $cond: {
+//                                     if: { $in: [req.user?._id, "$likes.likedBy"] },
+//                                     then: true,
+//                                     else: false
+//                                 }
+//                             }
+//                         }
+//                     },
+//                     {
+//                         $project: {
+//                             content: 1,
+//                             createdAt: 1,
+//                             isLiked: 1,
+//                             likesCount: 1,
+//                             owner: {
+//                                 userName: 1,
+//                                 fullName: 1,
+//                                 avatar: 1
+//                             }
+//                         }
+//                     }
+//                 ],
+//                 as: "comments"
+//             }
+//         },
+//         {
+//             $unwind: "$comments"
+//         },
+//         {
+//             $replaceRoot: { newRoot: "$comments" }
+//         },
+//         {
+//             $sort: { createdAt: -1 }
+//         }
+//     ];
+
+//     const options = {
+//         page: parseInt(page, 10),
+//         limit: parseInt(limit, 10)
+//     };
+
+//     try {
+//         const result = await Comment.aggregatePaginate(Comment.aggregate(pipeline), options);
+//         console.log(result)
+//         return res.status(200).json(new APIResponse(200, result, "Comments fetched successfully"));
+//     } catch (error) {
+//         console.error("Error fetching comments:", error);
+//         return res.status(500).json(new APIResponse(500, null, "Internal Server Error"));
+//     }
+// });
 
 
 const addComment = asyncHandler(async (req, res) => {
