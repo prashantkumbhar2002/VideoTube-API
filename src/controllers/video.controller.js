@@ -377,7 +377,7 @@ const updateVideo = asyncHandler(async(req, res) => {
     if(!video){
         throw new APIError(404, "Video not found")
     }
-    const updatedfields = {};
+    let updatedfields = {};
     if(title && title !== video.title){
         updatedfields.title = title;
     }
