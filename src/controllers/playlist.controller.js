@@ -95,7 +95,6 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
     if (!userId) {
         throw new APIError(400, "Please provide userID.");
     }
-    console.log(userId);
     try {
         const userPlaylist = await Playlist.aggregate([
             {
@@ -188,7 +187,6 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
                 },
             },
         ]);
-        console.log(userPlaylist);
         if (!userPlaylist || userPlaylist.length === 0) {
             throw new APIError(404, "User playlists not found.");
         }
@@ -208,7 +206,7 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
         }
     }
 });
-
+/*
 const getPlaylistById = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
     //TODO: get playlist by id
@@ -220,26 +218,26 @@ const getPlaylistById = asyncHandler(async (req, res) => {
         throw new APIError(404, "PlayList not found")
     }
     const playlistVideos = playList.videos.filter(video => video.isPublished);
-
+    console.log(playlistVideos);
     const videoLikesPipeline = [
         {
             $lookup: {
                 from: "likes",
-                localField: "_id",
+                localField: "videos",
                 foreignField: "video",
-                as: "likes"
-            }
+                as: "likes",
+            },
         },
         {
             $group: {
                 _id: null,
                 totalLikes: {
                     $sum: {
-                        Ssize: "$likes"
+                        $size: "$likes"
                     }
                 }
-            }
-        }
+            },
+        },
     ];
     const ownerPipeline = [
         {
@@ -262,13 +260,14 @@ const getPlaylistById = asyncHandler(async (req, res) => {
         Playlist.aggregate(videoLikesPipeline),
         Playlist.aggregate(ownerPipeline)
     ]);
-    const totalLikes = videosLikes.length > 0 ? videosLikes[0].totalLikes : 0;
+    console.log(videosLikes)
+    const playlistTotalLikes = videosLikes.length > 0 ? videosLikes[0].totalLikes : 0;
     const owner = ownerResult.length > 0 ? ownerResult[0] : {};
 
     const totalVideos = playlistVideos.length;
     const totalViews = playlistVideos.reduce((acc, cur)=> acc + cur.views, 0);
-    const playlistTotalLikes = playlistVideos.reduce((acc, cur) => acc + cur.likes.length, 0);
-    return {
+    // const playlistTotalLikes = playlistVideos.reduce((acc, cur) => acc + cur.likes.length, 0);
+    const result =  {
         _id: playList._id,
         name: playList.name,
         description: playList.description,
@@ -286,7 +285,7 @@ const getPlaylistById = asyncHandler(async (req, res) => {
             duration: video.duration,
             createdAt: video.createdAt,
             views: video.views,
-            likes: video.likes.length,
+            // likes: video.likes.length,
             videoOwner: {
                 userName: video.owner.userName,
                 fullName: video.owner.fullName
@@ -294,6 +293,126 @@ const getPlaylistById = asyncHandler(async (req, res) => {
         })),
         owner
     };
+
+    return res
+        .status(200)
+        .json(new APIResponse(200, result, "Fetched Playlits successfully"))
+})
+*/
+
+const getPlaylistById = asyncHandler(async (req, res) => {
+    const { playlistId } = req.params
+    //TODO: get playlist by id
+    if (!playlistId || !isValidObjectId(playlistId)) {
+        throw new APIError(400, "Please provide Valid playlist ID")
+    }
+    const playList = await Playlist.findById(playlistId).populate('videos');
+    if (!playList) {
+        throw new APIError(404, "PlayList not found")
+    }
+    const playListAggregate = await Playlist.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(playlistId)
+            }
+        },
+        {
+            $lookup: {
+                from: "videos",
+                localField: "videos",
+                foreignField: "_id",
+                as: "videos"
+            },
+        },
+        {
+            $unwind: "$videos",
+        },
+        {
+            $lookup: {
+                from: "likes",
+                localField: "videos._id",
+                foreignField: "video",
+                as: "videos.likes",
+            },
+        },
+        {
+            $addFields: {
+                "videos.totalLikes": {
+                    $size: "$videos.likes",
+                },
+            },
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "videos.owner",
+                foreignField: "_id",
+                as: "videos.videoOwner",
+            },
+        },
+        {
+            $addFields: {
+                "videos.videoOwner": {
+                    $arrayElemAt: ["$videos.videoOwner", 0],
+                },
+            },
+        },
+        {
+            $match: {
+                "videos.isPublished": true,
+            },
+        },
+        {
+            $group: {
+                _id: "$_id",
+                name: { $first: "$name" },
+                description: { $first: "$description" },
+                createdAt: { $first: "$createdAt" },
+                updatedAt: { $first: "$updatedAt" },
+                totalVideos: { $sum: 1 },
+                totalPlayListLikes: {
+                    $sum: "$videos.totalLikes",
+                },
+                videos: { $push: "$videos" },
+            },
+        },
+        {
+            $project: {
+                _id: 1,
+                name: 1,
+                description: 1,
+                createdAt: 1,
+                updatedAt: 1,
+                totalVideos: 1,
+                totalViews: 1,
+                totalPlayListLikes: 1,
+                videos: {
+                    _id: 1,
+                    videoFile: 1,
+                    thumbnail: 1,
+                    title: 1,
+                    description: 1,
+                    duration: 1,
+                    createdAt: 1,
+                    views: 1,
+                    likes: {
+                        $first: "$videos.totalLikes",
+                    },
+                    videoOwner: {
+                        userName: 1,
+                        email: 1,
+                        fullName: 1,
+                    },
+                },
+            },
+        },
+    ])
+    if (!playListAggregate) {
+        throw new APIError(500, "Error while fetching playlist")
+    }
+    return res
+        .status(200)
+        .json(new APIResponse(200, playListAggregate, "Fetched Playlits successfully"))
 })
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
