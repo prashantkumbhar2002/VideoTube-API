@@ -434,38 +434,170 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
     if(playList.owner?.toString() && video.owner.toString() !== req.user?._id.toString()){
         throw new APIError(400, "Only owner can add video to playlist")
     }
-    const updatePlaylist = await Playlist.findByIdAndUpdate(
-        playList?._id,
-        {
-            $addToSet: {
-                videos: videoId,
-            },
-        },
-        { new: true}
-    );
-    if(!updatePlaylist){
-        throw new APIError(500, "Error while updating playlist")
+    const Videos = playList.videos;
+    let valueExists = false;
+    for(let VideoID of Videos){
+        if(VideoID.equals(videoId)){
+            valueExists = true
+            break
+        }
     }
-    return res
-        .status(200)
-        .json( new APIResponse(200, updatePlaylist, "Successfully added video to playlist"))
+
+
+    /* 
+          $addToSet operator adds a value to an array field only if it does not already exist in the array.
+          $push operator appends a specified value to an array field in a MongoDB document.
+    */
+
+
+    if(!valueExists){
+        const updatedPlaylist = await Playlist.findByIdAndUpdate(
+            playList?._id,
+            {
+                $addToSet: {
+                    videos: videoId,
+                },
+            },
+            { new: true}
+        );
+        if(!updatedPlaylist){
+            throw new APIError(500, "Error while adding video to playlist")
+        }
+        return res
+            .status(200)
+            .json( new APIResponse(200, updatedPlaylist, "Successfully added video to playlist"))
+    }
+    else{
+        return res
+            .status(200)
+            .json(new APIResponse(200, "Video Already Exists"))
+    }
+    
 })
 
 const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
     const {playlistId, videoId} = req.params
     // TODO: remove video from playlist
+    if(!playlistId || !isValidObjectId(playlistId)){
+        throw new APIError(400, "Provide valid playListID")
+    }
+    if(!videoId || !isValidObjectId(videoId)){
+        throw new APIError(400, "Provide valid videoID")
+    }
+    const playlist = await Playlist.findById(playlistId);
+    if(!playlist){
+        throw new APIError(400, "Playlist not found")
+    }
+    const video = await Video.findById(videoId);
+    if(!video){
+        throw new APIError(400, "Video Not found")
+    }
+    if(playlist.owner?.toString() && video.owner?.toString() !== req.user?._id.toString()){
+        throw new APIError(400, "Only Owner can delete the video")
+    }
+    const Videos = playlist.videos;
+    let valueExists = false;
+    for(let VideoID of Videos){
+        if(VideoID.equals(videoId)){
+            valueExists = true
+            break
+        }
+    }
 
+    /* 
+        $pull operator remove a specified value from an array field in a MongoDB document.
+    */
+
+
+    if(valueExists){
+        const updatedPlaylist = await Playlist.findByIdAndUpdate(
+            playlist?._id,
+            {
+                $pull:{
+                    videos: videoId
+                } 
+            },
+            {new: true}
+        )
+        if(!updatedPlaylist){
+            throw new APIError(500, "Error while removing video from playlist")
+        }
+        return res
+            .status(200)
+            .json(new APIResponse(200, {updatedPlaylist}, "Video removed from playlist"))
+    }
+    else{
+        return res
+            .status(200)
+            .json(new APIResponse(200, "Video does not exist in the playlist"))
+    }
 })
 
 const deletePlaylist = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
     // TODO: delete playlist
+    if(!playlistId || !isValidObjectId(playlistId)){
+        throw new APIError(400, "Please provide valid Playlist ID")
+    }
+    const playlist = await Playlist.findById(playlistId);
+    if(!playlist){
+        throw new APIError(404, "Playlist not found")
+    }
+    if(playlist.owner?.toString() !== req.user?._id.toString()){
+        throw new APIError(400, "Only owner can delete the playlist")
+    }
+    try {
+        await Playlist.findByIdAndDelete(playlist?._id)
+        return res
+            .status(200)
+            .json(new APIResponse(200, {}, "Successfully deleted playlist"))
+    } catch (error) {
+        console.log(error)
+        throw new APIError(500, "Error while deleting PlayList")
+    }
 })
 
 const updatePlaylist = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
     const {name, description} = req.body
     //TODO: update playlist
+    if(!playlistId || !isValidObjectId(playlistId)){
+        throw new APIError(400, "Please provide playlist ID")
+    }
+    const playlist = await Playlist.findById(playlistId);
+    if(!playlist){
+        throw new APIError(400, "Playlist not found")
+    }
+    let updateFields = {};
+    if(name && name !== playlist.name){
+        updateFields.name = name;
+    }
+    if(description && description !== playlist.description){
+        updateFields.description = description;
+    }
+    if(playlist.owner?.toString() !== req.user?._id.toString()){
+        throw new APIError(400, "Only owner can update the playlist")    
+    }
+    if(Object.keys(updateFields).length === 0){
+        return res
+            .status(200)
+            .json(new APIResponse(200, playlist, "No changes made to playlist"))
+    }
+    const updatePlayList = await Playlist.findByIdAndUpdate(
+        playlistId,
+        {
+            $set: updateFields
+        },
+        {
+            new: true
+        }
+    )
+    if(!updatePlayList){
+        throw new APIError(500, "Error while updating playlist")
+    }
+    return res
+        .status(200)
+        .json(200, updatePlayList, "Successfully updated playlist")
 })
 
 export {
