@@ -37,6 +37,97 @@ const toggleSubscription = asyncHandler(async (req, res) => {
 // controller to return subscriber list of a channel
 const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     const { channelId } = req.params;
+    if(!channelId || !isValidObjectId(channelId)){
+        throw new APIError(400, "Provide Valid ChannelID");
+    }
+    // if(channelId !== req.user?._id){
+    //     throw new APIError(403, "Only Owner can Access this info")
+    // }
+    const subscribers = await Subscription.aggregate([
+        {
+            $match: {
+                channel: new mongoose.Types.ObjectId(channelId)
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "subscriber",
+                foreignField: "_id",
+                as: "subscriber",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "subscriptions",
+                            localField: "_id",
+                            foreignField: "channel",
+                            as: "subscribedToSubscriber"
+                        },
+                    },
+                    {
+                        $addFields: {
+                            subscribedToSubscriber: {
+                                $cond: {
+                                    if: {
+                                        $in: [new mongoose.Types.ObjectId(channelId), "$subscribedToSubscriber.subscriber"]
+                                    },
+                                    then: true,
+                                    else: false,
+                                },
+                            },
+                            subscribersCount: {
+                                $size: "$subscribedToSubscriber"
+                            }
+                        },
+                    }
+                ]
+            }
+        },
+        {
+            $unwind: "$subscriber",
+        },
+        // {
+        //     $project: {
+        //         _id: 0,
+        //         subscriber: {
+        //             _id: 1,
+        //             userName: 1,
+        //             fullName: 1,
+        //             avatar: 1,
+        //             subscribersCount: 1,
+        //             subscribedToSubscriber: 1
+        //         }
+        //     }
+        // }
+        {
+            $group: {
+                _id: null,
+                totalSubscribers: { $sum: 1 },
+                subscribers: { $push: "$subscriber" }
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                totalSubscribers: 1,
+                subscribers: {
+                    _id: 1,
+                    fullName: 1,
+                    userName: 1,
+                    avatar: 1,
+                    subscribersCount: 1,
+                    subscribedToSubscriber: 1
+                }
+            }
+        }
+    ])
+    if(!subscribers){
+        throw new APIError(500, "Error while fetching Subscribers")
+    }
+    // console.log(JSON.stringify(subscribers))
+    return res
+        .status(200)
+        .json(new APIResponse(200, subscribers, "Subscribers Fetched Successfully" ))
 });
 
 // controller to return channel list to which user has subscribed
