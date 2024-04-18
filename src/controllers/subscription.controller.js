@@ -127,12 +127,77 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     // console.log(JSON.stringify(subscribers))
     return res
         .status(200)
-        .json(new APIResponse(200, subscribers, "Subscribers Fetched Successfully" ))
+        .json(new APIResponse(200, subscribers[0], "Subscribers Fetched Successfully" ))
 });
 
 // controller to return channel list to which user has subscribed
 const getSubscribedChannels = asyncHandler(async (req, res) => {
     const { subscriberId } = req.params;
+    if(!subscriberId || !isValidObjectId(subscriberId)){
+        throw new APIError(400, "Provide valid UserID")
+    }
+    const subscribedChannels = await Subscription.aggregate([
+        {
+            $match: {
+                subscriber: new mongoose.Types.ObjectId(subscriberId)
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "channel",
+                foreignField: "_id",
+                as: "subscribedChannels",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "videos",
+                            localField: "_id",
+                            foreignField: "owner",
+                            as: "videos"
+                        }
+                    },
+                    {
+                        $addFields: {
+                            totalVideos: {
+                                $size: "$videos"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $unwind: "$subscribedChannels"
+        },
+        {
+            $group: {
+              _id: null,
+              subscribedChannels:{
+                $push: "$subscribedChannels"
+              }
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                subscribedChannels: {
+                    _id: 1,
+                    fullName: 1,
+                    userName: 1,
+                    avatar: 1,
+                    totalVideos: 1
+                }
+            }
+        }
+    ])
+
+    if(!subscribedChannels){
+        throw new APIError(500, "Error while fetching the Subscribed channels")
+    }
+    return res
+        .status(200)
+        .json(new APIResponse(200, subscribedChannels[0], "Subscribed-Channels fetched successfully"))
 });
 
 export { toggleSubscription, getUserChannelSubscribers, getSubscribedChannels };
